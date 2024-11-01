@@ -1,101 +1,202 @@
-import Image from "next/image";
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+type Note = {
+  id: number;
+  title: string;
+  content: string;
+};
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const [notes, setNotes] = useState<Note[]>([]);
+
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/notes");
+        const notes: Note[] = await response.json();
+        const sortedNotes = notes.sort((a, b) => b.id - a.id);
+        console.log(sortedNotes);
+        setNotes(sortedNotes);
+      } catch (e) {
+        console.error("Error fetching notes:", e);
+      }
+    };
+
+    fetchNotes();
+  }, []);
+
+  const handleAddNote = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch("http://localhost:5000/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title, content }),
+      });
+
+      const newNote = await response.json();
+      setNotes([newNote, ...notes]);
+      setTitle("");
+      setContent("");
+    } catch (e) {
+      console.error("Error adding note:", e);
+    }
+  };
+
+  const handleNoteClick = (note: Note) => {
+    setSelectedNote(note);
+    setTitle(note.title);
+    setContent(note.content);
+  };
+
+  const handleUpdateNote = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!selectedNote) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notes/${selectedNote.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-type": "application/json",
+          },
+          body: JSON.stringify({ title, content }),
+        }
+      );
+
+      const updateNote = await response.json();
+
+      const updateNoteList = notes.map((note) =>
+        note.id === selectedNote.id ? updateNote : note
+      );
+
+      setNotes(updateNoteList);
+      setTitle("");
+      setContent("");
+      setSelectedNote(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCancel = () => {
+    setTitle("");
+    setContent("");
+    setSelectedNote(null);
+  };
+
+  const deleteNote = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    noteId: number
+  ) => {
+    event.stopPropagation();
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notes/${noteId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok && response.status === 204) {
+        const updatedNotes = notes.filter((note) => note.id !== noteId);
+        setNotes(updatedNotes);
+      } else {
+        console.error("Failed to delete note.");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="app-container m-5 md:grid md:grid-cols-[200px_1fr] md:gap-5">
+      <form
+        className="note-form flex flex-col gap-5"
+        onSubmit={(event) =>
+          selectedNote ? handleUpdateNote(event) : handleAddNote(event)
+        }
+      >
+        {selectedNote ? (
+          <div className="flex flex-col">
+            <input
+              className="border border-black rounded p-2 text-lg mb-2"
+              placeholder={title === "" ? `Title` : title}
+              onChange={(event) => setTitle(event.target.value)}
+              required
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <textarea
+              className="border border-black rounded p-2 text-lg mb-2"
+              placeholder={content === "" ? "Content" : content}
+              onChange={(event) => setContent(event.target.value)}
+              rows={10}
+              required
+            />
+            <button
+              type="submit"
+              className="rounded bg-[#409AB8] p-2 text-lg text-white hover:bg-[#6AAFC6] mb-2"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="rounded bg-[#409AB8] p-2 text-lg text-white hover:bg-[#6AAFC6]"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="submit"
+            className="rounded bg-[#409AB8] p-2 text-lg text-white hover:bg-[#6AAFC6]"
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+            Add Note
+          </button>
+        )}
+      </form>
+
+      <div className="notes-grid grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] auto-rows-[minmax(250px,auto)] gap-5">
+        {notes.map((note) => (
+          <div
+            key={note.id}
+            className={
+              selectedNote !== null && selectedNote.id === note.id
+                ? `border-4 border-violet-300`
+                : `border-0`
+            }
+          >
+            <div
+              className="note-item flex flex-col border border-gray-300 rounded bg-gray-100 shadow cursor-pointer p-2 h-full"
+              onClick={() => handleNoteClick(note)}
+            >
+              <div className="notes-header flex justify-end">
+                <button
+                  className="text-lg bg-transparent border-none cursor-pointer"
+                  onClick={(e) => deleteNote(e, note.id)}
+                >
+                  x
+                </button>
+              </div>
+              <h2 className="m-0">{note.title}</h2>
+              <p>{note.content}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
