@@ -8,7 +8,7 @@ If you want to run it on your machine:
 
 ```
 ~/notes-app/$ npm run dev
-~/notes-app/$ cd notes-app/server
+~/notes-app/$ cd notes-app-server
 ~/notes-app/notes-app-server/$ npm start
 ```
 
